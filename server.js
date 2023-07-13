@@ -130,14 +130,34 @@ mongoose
                 }
 
                 // If authentication is successful, manually log in the user
-                req.login(user, (loginErr) => {
-                    if (loginErr) {
-                        console.error("Error logging in:", loginErr);
+                req.login(user, async (loginErr) => {
+                    try {
+                        if (loginErr) {
+                            console.error("Error logging in:", loginErr);
+                            return res.status(500).json({ message: "Internal server error" });
+                        }
+
+                        // Authentication successful
+                        const userData = await User.findOne({ email: user.email });
+
+                        if (!userData) {
+                            // Handle the case where user data is not found
+                            return res.status(404).json({ message: "User data not found" });
+                        }
+
+                        const userDataWithoutPassword = {
+                            _id: userData._id,
+                            email: userData.email,
+                            firstName: userData.firstName,
+                            lastName: userData.lastName,
+                        };
+
+                        // Return success response with user data
+                        return res.json({ message: userDataWithoutPassword });
+                    } catch (error) {
+                        console.error("Error logging in:", error);
                         return res.status(500).json({ message: "Internal server error" });
                     }
-
-                    // Authentication successful, return success response
-                    return res.json({ message: "Login successful" });
                 });
             })(req, res, next);
         });
