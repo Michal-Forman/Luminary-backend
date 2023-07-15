@@ -24,19 +24,30 @@ app.use(passport.session());
 // Connect to the MongoDB database
 const dbUrl = process.env.MONGODB_URI;
 mongoose
-    .connect(dbUrl, { useNewUrlParser: true, useUnifiedTopology: true })
+    .connect(dbUrl, {useNewUrlParser: true, useUnifiedTopology: true})
     .then(() => {
         console.log('Connected to the database');
 
         // Create a User model
         const userSchema = new mongoose.Schema({
-            email: { type: String, required: true },
-            firstName: { type: String, required: true },
-            lastName: { type: String, required: true },
-            password: { type: String, required: true },
+            email: {type: String, required: true},
+            firstName: {type: String, required: true},
+            lastName: {type: String, required: true},
+            password: {type: String, required: true}
         });
 
         const User = mongoose.model('User', userSchema);
+
+        // Create a Journal model
+
+        const journalSchema = new mongoose.Schema({
+            mood: {type: Number, required: true},
+            content: {type: String, required: true},
+            date: {type: String, required: true},
+            user: {type: mongoose.Schema.Types.ObjectId, ref: 'User'}
+        });
+
+        const Journal = mongoose.model('Journal', journalSchema);
 
         // Serialize and deserialize user for session management
         passport.serializeUser((user, done) => {
@@ -51,20 +62,20 @@ mongoose
 
         // Configure the local strategy for Passport
         passport.use(
-            new LocalStrategy({ usernameField: 'email' }, async (email, password, done) => {
+            new LocalStrategy({usernameField: 'email'}, async (email, password, done) => {
                 try {
                     // Find the user by email in the database
-                    const user = await User.findOne({ email });
+                    const user = await User.findOne({email});
 
                     if (!user) {
-                        return done(null, false, { message: 'Invalid email or password' });
+                        return done(null, false, {message: 'Invalid email or password'});
                     }
 
                     // Compare the provided password with the hashed password in the database
                     const isMatch = await bcrypt.compare(password, user.password);
 
                     if (!isMatch) {
-                        return done(null, false, { message: 'Invalid email or password' });
+                        return done(null, false, {message: 'Invalid email or password'});
                     }
 
                     // If everything is correct, return the user object
@@ -80,19 +91,19 @@ mongoose
 
         // Waiting screen
         app.get('/', (req, res) => {
-            res.json({ message: 'Hello World' });
+            res.json({message: 'Hello World'});
         });
 
         // Registration route
         app.post('/register', async (req, res) => {
-            const { email, firstName, lastName, password } = req.body;
+            const {email, firstName, lastName, password} = req.body;
 
             try {
                 // Check if the user already exists in the database
-                const existingUser = await User.findOne({ email });
+                const existingUser = await User.findOne({email});
 
                 if (existingUser) {
-                    return res.status(409).json({ message: 'User already exists' });
+                    return res.status(409).json({message: 'User already exists'});
                 }
 
                 // Hash the password using bcrypt
@@ -109,11 +120,22 @@ mongoose
                 // Save the new user to the database
                 await newUser.save();
 
+                const userData = await User.findOne({email: email});
+
+                const userDataWithoutPassword = {
+                    _id: userData._id,
+                    email: userData.email,
+                    firstName: userData.firstName,
+                    lastName: userData.lastName,
+                };
+
+                // Return success response with user data
+                return res.json({message: userDataWithoutPassword});
+
                 // Return a success message
-                res.status(200).json({ message: 'Registration successful' });
             } catch (error) {
                 console.error('Error registering user:', error);
-                res.status(500).json({ message: 'Internal server error' });
+                res.status(500).json({message: 'Internal server error'});
             }
         });
 
@@ -122,11 +144,11 @@ mongoose
             passport.authenticate("local", (err, user, info) => {
                 if (err) {
                     console.error("Error logging in:", err);
-                    return res.status(500).json({ message: "Internal server error" });
+                    return res.status(500).json({message: "Internal server error"});
                 }
 
                 if (!user) {
-                    return res.status(401).json({ message: "Invalid email or password" });
+                    return res.status(401).json({message: "Invalid email or password"});
                 }
 
                 // If authentication is successful, manually log in the user
@@ -134,15 +156,15 @@ mongoose
                     try {
                         if (loginErr) {
                             console.error("Error logging in:", loginErr);
-                            return res.status(500).json({ message: "Internal server error" });
+                            return res.status(500).json({message: "Internal server error"});
                         }
 
                         // Authentication successful
-                        const userData = await User.findOne({ email: user.email });
+                        const userData = await User.findOne({email: user.email});
 
                         if (!userData) {
                             // Handle the case where user data is not found
-                            return res.status(404).json({ message: "User data not found" });
+                            return res.status(404).json({message: "User data not found"});
                         }
 
                         const userDataWithoutPassword = {
@@ -153,13 +175,83 @@ mongoose
                         };
 
                         // Return success response with user data
-                        return res.json({ message: userDataWithoutPassword });
+                        return res.json({message: userDataWithoutPassword});
                     } catch (error) {
                         console.error("Error logging in:", error);
-                        return res.status(500).json({ message: "Internal server error" });
+                        return res.status(500).json({message: "Internal server error"});
                     }
                 });
             })(req, res, next);
+        });
+
+        // Create a new journal route
+        app.post('/journal', async (req, res) => {
+            const {mood, content, date, userEmail} = req.body;
+
+            try {
+                // Find the user document based on the userEmail
+                const user = await User.findOne({email: userEmail});
+
+                if (!user) {
+                    return res.status(404).json({error: 'User not found'});
+                }
+
+                // Create the journal document and associate it with the user
+                const journal = new Journal({
+                    mood,
+                    content,
+                    date,
+                    user: user._id,
+                });
+
+                // Save the journal document
+                await journal.save();
+
+                return res.status(201).json({ message: 'Journal created successfully' });
+
+                // Save the new journal to the database
+            } catch (error) {
+                console.error(error);
+                return res.status(500).json({error: 'Server error'});
+            }
+        });
+
+        // Fetch all journals for a user
+        app.get("/journals/:id", async (req, res) => {
+            try {
+                const userId = req.params.id;
+
+                // Find the user document based on the provided user ID
+                const user = await User.findById(userId);
+
+                if (!user) {
+                    return res.status(404).json({ error: "User not found" });
+                }
+
+                // Fetch the journals associated with the user
+                const journals = await Journal.find({ user: user._id });
+
+                return res.json(journals);
+            } catch (error) {
+                console.error(error);
+                return res.status(500).json({ error: "Server error" });
+            }
+        });
+
+        // Delete a journal
+        app.delete("/journals/:id", async (req, res) => {
+            const journalId = req.params.id;
+
+            try {
+                // Delete the journal entry from the database using the journalId
+                await Journal.findByIdAndDelete(journalId);
+
+                // Send a success response back to the client
+                res.sendStatus(204); // No Content
+            } catch (error) {
+                console.error(error);
+                res.sendStatus(500); // Internal Server Error
+            }
         });
 
         // Start the server
