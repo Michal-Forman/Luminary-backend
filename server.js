@@ -39,7 +39,6 @@ mongoose
         const User = mongoose.model('User', userSchema);
 
         // Create a Journal model
-
         const journalSchema = new mongoose.Schema({
             mood: {type: Number, required: true},
             content: {type: String, required: true},
@@ -48,6 +47,28 @@ mongoose
         });
 
         const Journal = mongoose.model('Journal', journalSchema);
+
+        // Create a Habit model
+        const habitSchema = new mongoose.Schema({
+            name: {type: String, required: true},
+            dailyGoal: {type: Number, required: true},
+            streak: {type: Number, required: true, default: 0},
+            user: {type: mongoose.Schema.Types.ObjectId, ref: 'User'}
+        });
+
+        const Habit = mongoose.model('Habit', habitSchema);
+
+        // Create a Exercise model
+        const exerciseSchema = new mongoose.Schema({
+            name: {type: String, required: true},
+            weight: {type: Number, required: true},
+            repetition1: {type: Number, required: true},
+            repetition2: {type: Number, required: true},
+            repetition3: {type: Number, required: true},
+            user: {type: mongoose.Schema.Types.ObjectId, ref: 'User'}
+        });
+
+        const Exercise = mongoose.model('Exercise', exerciseSchema);
 
         // Serialize and deserialize user for session management
         passport.serializeUser((user, done) => {
@@ -198,16 +219,16 @@ mongoose
 
                 // Create the journal document and associate it with the user
                 const journal = new Journal({
-                    mood,
-                    content,
-                    date,
+                    mood: mood,
+                    content: content,
+                    date: date,
                     user: user._id,
                 });
 
                 // Save the journal document
                 await journal.save();
 
-                return res.status(201).json({ message: 'Journal created successfully' });
+                return res.status(201).json({message: 'Journal created successfully'});
 
                 // Save the new journal to the database
             } catch (error) {
@@ -225,16 +246,16 @@ mongoose
                 const user = await User.findById(userId);
 
                 if (!user) {
-                    return res.status(404).json({ error: "User not found" });
+                    return res.status(404).json({error: "User not found"});
                 }
 
                 // Fetch the journals associated with the user
-                const journals = await Journal.find({ user: user._id });
+                const journals = await Journal.find({user: user._id});
 
                 return res.json(journals);
             } catch (error) {
                 console.error(error);
-                return res.status(500).json({ error: "Server error" });
+                return res.status(500).json({error: "Server error"});
             }
         });
 
@@ -254,7 +275,115 @@ mongoose
             }
         });
 
-        // Start the server
+        // Create new habit
+        app.post("/habit", async (req, res) => {
+            const {habitName, habitDailyGoal, userEmail} = req.body;
+            try {
+                console.log(habitName, habitDailyGoal, userEmail, "THIS IS IMPORTANT");
+                const user = await User.findOne({email: userEmail});
+
+                if (!user) {
+                    return res.status(404).json({error: 'User not found'});
+                }
+
+                const habit = new Habit({
+                    name: habitName,
+                    dailyGoal: habitDailyGoal,
+                    streak: 0,
+                    user: user._id,
+                });
+
+                await habit.save();
+
+                return res.status(201).json({message: 'Habit created successfully'});
+
+            } catch (error) {
+                console.error(error);
+                return res.status(500).json({error: 'Server error'});
+            }
+        });
+
+        app.get("/habit/:id", async (req, res) => {
+            try {
+                const userId = req.params.id;
+
+                const user = await User.findById(userId);
+
+                if (!user) {
+                    return res.status(404).json({error: "User not found"});
+                }
+
+                const habits = await Habit.find({user: user._id});
+
+                return res.json(habits);
+            } catch (error) {
+                console.error(error);
+                return res.status(500).json({error: "Server error"});
+            }
+        });
+
+        // Create new exercise
+        app.post("/exercise", async (req, res) => {
+            console.log(req.body);
+            const {
+                exerciseName,
+                exerciseWeight,
+                repetition1,
+                repetition2,
+                repetition3,
+                userEmail
+            } = req.body;
+            try {
+                console.log(exerciseName, exerciseWeight, repetition1, repetition2, repetition3, userEmail, "THIS IS IMPORTANT");
+                const user = await User.findOne({email: userEmail});
+
+                if (!user) {
+                    return res.status(404).json({error: 'User not found'});
+                }
+
+                const exercise = new Exercise({
+                    name: exerciseName,
+                    weight: exerciseWeight,
+                    repetition1: repetition1,
+                    repetition2: repetition2,
+                    repetition3: repetition3,
+                    user: user._id,
+                });
+
+                await exercise.save();
+
+                console.log(exercise, "THIS IS IMPORTANT, this is final exercise<-");
+
+                return res.status(201).json({message: 'Habit created successfully'});
+            } catch (error) {
+                console.error(error);
+                return res.status(500).json({error: 'Server error'});
+            }
+        });
+
+        // Fetch all exercises for a user
+        app.get("/exercise/:id", async (req, res) => {
+            try {
+                const userId = req.params.id;
+
+                // Find the user document based on the provided user ID
+                const user = await User.findById(userId);
+
+                if (!user) {
+                    return res.status(404).json({error: "User not found"});
+                }
+
+                // Fetch the journals associated with the user
+                const exercises = await Exercise.find({user: user._id});
+
+                return res.json(exercises);
+            } catch (error) {
+                console.error(error);
+                return res.status(500).json({error: "Server error"});
+            }
+        });
+
+// Start the server
         app.listen(6060, () => {
             console.log('Server is listening on port 6060');
         });
