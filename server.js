@@ -383,6 +383,41 @@ mongoose
             }
         });
 
+        // Delete an exercise
+        app.delete("/exercise/:id", async (req, res) => {
+           const exerciseId = req.params.id;
+
+           try {
+                await Exercise.findByIdAndDelete(exerciseId);
+
+                res.sendStatus(204);
+           } catch (error) {
+                console.error(error);
+                res.sendStatus(500);
+           }
+        });
+
+        // Change an exercise
+        app.put("/exercise/", async (req, res) => {
+            console.log(req.body);
+            const {exerciseId, exerciseName, exerciseWeight, repetition1, repetition2, repetition3} = req.body;
+
+            try {
+                await Exercise.findByIdAndUpdate(exerciseId, {
+                    name: exerciseName,
+                    weight: exerciseWeight,
+                    repetition1: repetition1,
+                    repetition2: repetition2,
+                    repetition3: repetition3,
+                });
+
+                res.sendStatus(204);
+            } catch (error) {
+                console.error(error);
+                res.sendStatus(500);
+            }
+        });
+
 // Start the server
         app.listen(6060, () => {
             console.log('Server is listening on port 6060');
