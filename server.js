@@ -111,6 +111,39 @@ mongoose
       });
     });
 
+    // Configure the local strategy for Passport
+    passport.use(
+      new LocalStrategy(
+        { usernameField: "email" },
+        async (email, password, done) => {
+          try {
+            // Find the user by email in the database
+            const user = await User.findOne({ email });
+
+            if (!user) {
+              return done(null, false, {
+                message: "Invalid email or password",
+              });
+            }
+
+            // Compare the provided password with the hashed password in the database
+            const isMatch = await bcrypt.compare(password, user.password);
+
+            if (!isMatch) {
+              return done(null, false, {
+                message: "Invalid email or password",
+              });
+            }
+
+            // If everything is correct, return the user object
+            return done(null, user);
+          } catch (error) {
+            return done(error);
+          }
+        },
+      ),
+    );
+
     // Middleware for parsing JSON bodies
     app.use(express.json());
 
