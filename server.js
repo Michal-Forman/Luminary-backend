@@ -13,15 +13,6 @@ const multer = require("multer");
 const app = express();
 app.use(cors());
 app.use(bodyParser.json());
-app.use(
-  session({
-    secret: process.env.SESSION_SECRET,
-    resave: false,
-    saveUninitialized: false,
-  }),
-);
-app.use(passport.initialize());
-app.use(passport.session());
 
 // OpenAI API
 const configuration = new Configuration({
@@ -29,9 +20,6 @@ const configuration = new Configuration({
 });
 
 const openai = new OpenAIApi(configuration);
-
-const storage = multer.memoryStorage(); // Use memory storage to handle files as buffers
-const upload = multer({ storage: storage });
 
 // Connect to the MongoDB database
 const dbUrl = process.env.MONGODB_URI;
@@ -99,14 +87,6 @@ mongoose
       exerciseProgressionSchema,
     );
 
-    // Create a Profile Image model
-    const profileImageSchema = new mongoose.Schema({
-      imageData: { type: Buffer, required: true },
-      user: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
-    });
-
-    const ProfileImage = mongoose.model("ProfileImage", profileImageSchema);
-
     // Create a messagess model
     const messagesSchema = new mongoose.Schema({
       messages: [
@@ -130,39 +110,6 @@ mongoose
         done(err, user);
       });
     });
-
-    // Configure the local strategy for Passport
-    passport.use(
-      new LocalStrategy(
-        { usernameField: "email" },
-        async (email, password, done) => {
-          try {
-            // Find the user by email in the database
-            const user = await User.findOne({ email });
-
-            if (!user) {
-              return done(null, false, {
-                message: "Invalid email or password",
-              });
-            }
-
-            // Compare the provided password with the hashed password in the database
-            const isMatch = await bcrypt.compare(password, user.password);
-
-            if (!isMatch) {
-              return done(null, false, {
-                message: "Invalid email or password",
-              });
-            }
-
-            // If everything is correct, return the user object
-            return done(null, user);
-          } catch (error) {
-            return done(error);
-          }
-        },
-      ),
-    );
 
     // Middleware for parsing JSON bodies
     app.use(express.json());
@@ -615,34 +562,6 @@ mongoose
       });
       const reply = chat_completion.data.choices[0].message.content;
       res.send(reply);
-    });
-
-    // Create Profile Image
-
-    app.post("/profile-image/:id", upload.single("image"), async (req, res) => {
-      const userId = req.params.id;
-      const imageBuffer = req.file.buffer;
-      console.log("imageBuffer ->", imageBuffer);
-
-      try {
-        const user = await User.findById(userId);
-
-        if (!user) {
-          return res.status(404).json({ error: "User not found" });
-        }
-
-        const profileImage = new ProfileImage({
-          imageData: imageBuffer,
-          user: user._id,
-        });
-
-        await profileImage.save();
-
-        return res.status(201).json({ message: "Image created successfully" });
-      } catch (error) {
-        console.error(error);
-        return res.status(500).json({ error: "Server error" });
-      }
     });
 
     // Start the server
