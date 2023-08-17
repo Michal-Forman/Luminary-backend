@@ -13,6 +13,15 @@ const multer = require("multer");
 const app = express();
 app.use(cors());
 app.use(bodyParser.json());
+app.use(
+  session({
+    secret: process.env.SESSION_SECRET,
+    resave: false,
+    saveUninitialized: false,
+  }),
+);
+app.use(passport.initialize());
+app.use(passport.session());
 
 // OpenAI API
 const configuration = new Configuration({
